@@ -11,9 +11,15 @@
         y = 2;
 
     var gameSocket = null;
+    var playerSocket = null;
     
     function init() {
-        gameSocket = new WebSocket("ws://localhost:9000/pixel");
+        gameSocket = new WebSocket("ws://localhost:9000/drawer");
+        playerSocket = new WebSocket("ws://localhost:9000/player");
+
+        playerSocket.onmessage = function (event) {
+          console.log(event.data);
+        }
 
         canvas = document.getElementById('can');
         ctx = canvas.getContext("2d");
