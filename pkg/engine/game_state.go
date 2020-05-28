@@ -1,25 +1,19 @@
 package engine
 
-// import (
-// 	"encoding/binary"
-// 	"log"
-// 	"time"
+import (
+	"github.com/gorilla/websocket"
+)
 
-// 	"github.com/gorilla/websocket"
-// )
+type GameState struct {
+	drawer_conn *websocket.Conn
+	player_conn *websocket.Conn
+	pixels      chan Pixel
+}
 
-// func readPixels() {
-// 	for {
-// 		_, drawBuffer, err := drawConn.ReadMessage()
-// 		if err != nil {
-// 			log.Println("draw_stream_read_error", err)
-// 			break
-// 		}
+type Pixel struct {
+	x, y uint32
+}
 
-// 		// TODO: let's marshal this into a struct
-// 		x := binary.LittleEndian.Uint32(drawBuffer[:4])
-// 		y := binary.LittleEndian.Uint32(drawBuffer[4:])
-// 		log.Printf("(%d,%d)", x, y)
-// 	}
-
-// }
+func InitGameState() *GameState {
+	return &GameState{pixels: make(chan Pixel)}
+}
