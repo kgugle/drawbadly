@@ -22,14 +22,14 @@ func main() {
 
 	// init game state
 
-	game_state := engine.InitGameState()
+	game := engine.NewGame()
 
 	// define endpoints
 	http.HandleFunc("/drawer", func(w http.ResponseWriter, r *http.Request) {
-		engine.DrawerHandler(game_state, w, r)
+		engine.DrawerHandler(game, w, r)
 	})
 	http.HandleFunc("/player", func(w http.ResponseWriter, r *http.Request) {
-		engine.PlayerHandler(game_state, w, r)
+		engine.PlayerHandler(game, w, r)
 	})
 	http.HandleFunc("/liveness", engine.LivenessHandler)
 
