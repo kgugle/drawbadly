@@ -35,12 +35,9 @@ func DrawerHandler(g *Game, w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("drawer connected")
 	defer drawConn.Close()
-	
-	
-	g.Drawer = &PlayerState{
-		ID: 
-	}
-	g.drawer_conn = drawConn
+
+	playerID := g.registerPlayer(drawConn)
+	log.Printf("drawer has ID %d", playerID)
 
 	for {
 		_, drawBuffer, err := drawConn.ReadMessage()
@@ -67,7 +64,8 @@ func PlayerHandler(g *Game, w http.ResponseWriter, r *http.Request) {
 	log.Println("player connected")
 	defer playerConn.Close()
 
-	g.player_conn = playerConn
+	playerID := g.registerPlayer(playerConn)
+	log.Printf("player has ID %d", playerID)
 
 	for {
 		select {

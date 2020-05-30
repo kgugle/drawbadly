@@ -46,10 +46,42 @@ type PlayerState struct {
 	Status ConnectionStatus
 }
 
+type PlayerMap struct {
+	sync.RWMutex
+	internal map[int]*PlayerState
+}
+
+func makePlayerMap() *PlayerMap {
+	return &PlayerMap{internal: make(map[int]*PlayerState)}
+}
+
+func (c *PlayerMap) LoadOrStore(key int, value *PlayerState) (actual *PlayerState, loaded bool) {
+	c.Lock()
+	defer c.Unlock()
+	actual, ok := c.internal[key]
+	if !ok {
+		c.internal[key] = value
+		return value, false
+	}
+	return actual, true
+}
+
+func (c *PlayerMap) Length() int {
+	c.Lock()
+	defer c.Unlock()
+	return len(c.internal)
+}
+
+func (c *PlayerMap) Delete(key int) {
+	c.Lock()
+	defer c.Unlock()
+	delete(c.internal, key)
+}
+
 // Game ...
 type Game struct {
-	PlayerMap sync.Map // ID -> PlayerState
-	Drawer    *PlayerState
+	PlayersByID *PlayerMap // ID -> PlayerState
+	Drawer      *PlayerState
 
 	Start time.Time
 
@@ -58,10 +90,13 @@ type Game struct {
 
 func NewGame() *Game {
 	return &Game{
-		PixelChan: make(chan Pixel),
+		PlayersByID: makePlayerMap(),
+		PixelChan:   make(chan Pixel),
 	}
 }
 
-// func (g *Game) registerPlayer(ws *websocket.Conn, drawer bool) {
-// 	g.PlayerMap.Store()
-// }
+func (g *Game) registerPlayer(ws *websocket.Conn) (newID int) {
+	newID = g.PlayersByID.Length()
+	g.PlayersByID.LoadOrStore(newID, &PlayerState{Conn: ws})
+	return newID
+}
