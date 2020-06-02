@@ -26,36 +26,8 @@ func LivenessHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-// DrawerHandler receives the x,y coordinates sent by the drawing client.
-func DrawerHandler(g *Game, w http.ResponseWriter, r *http.Request) {
-	drawConn, err := upgrade_connection_to_ws(w, r)
-	if err != nil {
-		log.Print("draw_stream_upgrade_failed", err)
-		return
-	}
-	log.Println("drawer connected")
-	defer drawConn.Close()
-
-	playerID := g.registerPlayer(drawConn)
-	log.Printf("drawer has ID %d", playerID)
-
-	for {
-		_, drawBuffer, err := drawConn.ReadMessage()
-		if err != nil {
-			log.Println("draw_stream_read_error", err)
-			break
-		}
-
-		// TODO: let's marshal this into a struct
-		x := binary.LittleEndian.Uint32(drawBuffer[:4])
-		y := binary.LittleEndian.Uint32(drawBuffer[4:])
-		g.PixelChan <- Pixel{x, y, uint8(0)}
-		log.Printf("server received (%d,%d)", x, y)
-	}
-}
-
-// PlayerHandler receives the x,y coordinates sent by the drawing client.
-func PlayerHandler(g *Game, w http.ResponseWriter, r *http.Request) {
+// GameHandler serves the game
+func GameHandler(g *Game, w http.ResponseWriter, r *http.Request) {
 	playerConn, err := upgrade_connection_to_ws(w, r)
 	if err != nil {
 		log.Print("player_stream_upgrade_failed", err)
@@ -65,20 +37,43 @@ func PlayerHandler(g *Game, w http.ResponseWriter, r *http.Request) {
 	defer playerConn.Close()
 
 	playerID := g.registerPlayer(playerConn)
-	log.Printf("player has ID %d", playerID)
+	log.Printf("player registered with ID %d", playerID)
 
-	for {
-		select {
-		case pixel, ok := <-g.PixelChan:
-			if !ok {
-				log.Println("pixel_channel_error", err)
-				return
+	if g.PlayersByID.Length() == 1 {
+		playerState, ok := g.PlayersByID.LoadOrStore(playerID, nil)
+		if !ok {
+			log.Print("get_drawer_state_failed", err)
+			return
+		}
+		g.Drawer = playerState
+
+		for {
+			_, drawBuffer, err := playerConn.ReadMessage()
+
+			if err != nil {
+				log.Println("draw_stream_read_error", err)
+				break
 			}
-			msg := fmt.Sprintf("%d %d\n", pixel.X, pixel.Y)
 
-			if err := playerConn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
-				log.Println("player_stream_write_error", err)
-				return
+			// TODO: let's marshal this into a struct
+			x := binary.LittleEndian.Uint32(drawBuffer[:4])
+			y := binary.LittleEndian.Uint32(drawBuffer[4:])
+			g.PixelChan <- Pixel{x, y, uint8(0)}
+		}
+	} else {
+		for {
+			select {
+			case pixel, ok := <-g.PixelChan:
+				if !ok {
+					log.Println("pixel_channel_error", err)
+					return
+				}
+				msg := fmt.Sprintf("%d %d\n", pixel.X, pixel.Y)
+
+				if err := playerConn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
+					log.Println("player_stream_write_error", err)
+					return
+				}
 			}
 		}
 	}

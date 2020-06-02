@@ -20,16 +20,12 @@ func init() {
 func main() {
 	flag.Parse()
 
-	// init game state
-
+	// TODO: replace with game hub
 	game := engine.NewGame()
 
 	// define endpoints
-	http.HandleFunc("/drawer", func(w http.ResponseWriter, r *http.Request) {
-		engine.DrawerHandler(game, w, r)
-	})
-	http.HandleFunc("/player", func(w http.ResponseWriter, r *http.Request) {
-		engine.PlayerHandler(game, w, r)
+	http.HandleFunc("/game", func(w http.ResponseWriter, r *http.Request) {
+		engine.GameHandler(game, w, r)
 	})
 	http.HandleFunc("/liveness", engine.LivenessHandler)
 

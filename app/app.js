@@ -2,21 +2,17 @@ var canvas, ctx, flag = false,
     prevX = 0,
     currX = 0,
     prevY = 0,
-    currY = 0,
-    dot_flag = false;
-
-var x = "black",
-    y = 2;
+    currY = 0;
+var penColor = "black",
+    penWidth = 2;
 
 var gameSocket = null;
-var playerSocket = null;
 
 function init() {
-    gameSocket = new WebSocket("ws://localhost:9000/drawer");
-    playerSocket = new WebSocket("ws://localhost:9000/player");
+    gameSocket = new WebSocket("ws://localhost:9000/game");
 
-    playerSocket.onmessage = function (event) {
-      console.log("player received", event.data);
+    gameSocket.onmessage = function (event) {
+      drawReceivedPixel(event.data);
     }
 
     canvas = document.getElementById('can');
@@ -45,32 +41,40 @@ function sendPixel(currX, currY) {
     gameSocket.send(pixelBuffer.buffer);
 }
 
+function drawReceivedPixel(pixel_data) {
+  var res = pixel_data.split(" "),
+      x = res[0],
+      y = res[1];
+  ctx.fillStyle = penColor;
+  ctx.fillRect(x, y, penWidth, penWidth);
+}
+
 function color(obj) {
     switch (obj.id) {
         case "green":
-            x = "green";
+            penColor = "green";
             break;
         case "blue":
-            x = "blue";
+            penColor = "blue";
             break;
         case "red":
-            x = "red";
+            penColor = "red";
             break;
         case "yellow":
-            x = "yellow";
+            penColor = "yellow";
             break;
         case "orange":
-            x = "orange";
+            penColor = "orange";
             break;
         case "black":
-            x = "black";
+            penColor = "black";
             break;
         case "white":
-            x = "white";
+            penColor = "white";
             break;
     }
-    if (x == "white") y = 14;
-    else y = 2;
+    if (penColor == "white") penWidth = 14;
+    else penWidth = 2;
 
 }
 
@@ -78,8 +82,8 @@ function draw() {
     ctx.beginPath();
     ctx.moveTo(prevX, prevY);
     ctx.lineTo(currX, currY);
-    ctx.strokeStyle = x;
-    ctx.lineWidth = y;
+    ctx.strokeStyle = penColor;
+    ctx.lineWidth = penWidth;
     ctx.stroke();
     ctx.closePath();
 }
@@ -110,10 +114,11 @@ function findxy(res, e) {
         dot_flag = true;
         if (dot_flag) {
             ctx.beginPath();
-            ctx.fillStyle = x;
-            ctx.fillRect(currX, currY, 2, 2);
+            ctx.fillStyle = penColor;
+            ctx.fillRect(currX, currY, penWidth, penWidth);
             ctx.closePath();
             dot_flag = false;
+
             sendPixel(currX, currY);
         }
     }
@@ -127,6 +132,7 @@ function findxy(res, e) {
             currX = e.clientX - canvas.offsetLeft;
             currY = e.clientY - canvas.offsetTop;
             draw();
+
             sendPixel(currX, currY);
         }
     }

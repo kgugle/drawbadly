@@ -1,18 +1,12 @@
 package engine
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
-
-// Pixel ...
-type Pixel struct {
-	X     uint32
-	Y     uint32
-	Color uint8
-}
 
 // ConnectionStatus describes the connection status of server <-> player.
 type ConnectionStatus int
@@ -80,19 +74,26 @@ func (c *PlayerMap) Delete(key int) {
 
 // Game ...
 type Game struct {
-	PlayersByID *PlayerMap // ID -> PlayerState
+	PlayersByID *PlayerMap // Player ID -> PlayerState
 	Drawer      *PlayerState
 
+	ID    string
 	Start time.Time
 
 	PixelChan chan Pixel
 }
 
 func NewGame() *Game {
+	// TODO: randomly generate an ID
 	return &Game{
+		ID:          "asdf",
 		PlayersByID: makePlayerMap(),
 		PixelChan:   make(chan Pixel),
 	}
+}
+
+func (g *Game) gameURL() (url string) {
+	return fmt.Sprintf("localhost:9000/%s", g.ID)
 }
 
 func (g *Game) registerPlayer(ws *websocket.Conn) (newID int) {
