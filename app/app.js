@@ -2,7 +2,11 @@ var canvas, ctx, flag = false,
     prevX = 0,
     currX = 0,
     prevY = 0,
-    currY = 0;
+    currY = 0,
+    prevReceivedX = 0,
+    currReceivedX = 0,
+    prevReceivedY = 0,
+    currReceivedY = 0;
 var penColor = "black",
     penWidth = 2;
 
@@ -34,19 +38,33 @@ function init() {
     }, false);        
 }
 
-function sendPixel(currX, currY) {
-    var pixelBuffer = new Uint32Array(2);
+function sendPixel(currX, currY, stroke_start) {
+    var pixelBuffer = new Uint32Array(3);
     pixelBuffer[0] = currX;
     pixelBuffer[1] = currY;
+    pixelBuffer[2] = stroke_start;
     gameSocket.send(pixelBuffer.buffer);
 }
 
 function drawReceivedPixel(pixel_data) {
   var res = pixel_data.split(" "),
       x = res[0],
-      y = res[1];
-  ctx.fillStyle = penColor;
-  ctx.fillRect(x, y, penWidth, penWidth);
+      y = res[1],
+      stroke_start = res[2];
+  console.log(res)
+  if (stroke_start == 1) {
+    draw_start(x, y);
+    prevReceivedX = x;
+    prevReceivedY = y;
+    currReceivedX = x;
+    currReceivedY = y;
+  } else {
+    prevReceivedX = currReceivedX;
+    prevReceivedY = currReceivedY;
+    currReceivedX = x;
+    currReceivedY = y;
+    draw_arc(prevReceivedX, prevReceivedY, currReceivedX, currReceivedY);
+  }
 }
 
 function color(obj) {
@@ -78,7 +96,15 @@ function color(obj) {
 
 }
 
-function draw() {
+function draw_start(currX, currY) {
+    ctx.beginPath();
+    ctx.fillStyle = penColor;
+    ctx.fillRect(currX, currY, penWidth, penWidth);
+    ctx.closePath();
+}
+
+
+function draw_arc(prevX, prevY, currX, currY) {
     ctx.beginPath();
     ctx.moveTo(prevX, prevY);
     ctx.lineTo(currX, currY);
@@ -113,13 +139,10 @@ function findxy(res, e) {
         flag = true;
         dot_flag = true;
         if (dot_flag) {
-            ctx.beginPath();
-            ctx.fillStyle = penColor;
-            ctx.fillRect(currX, currY, penWidth, penWidth);
-            ctx.closePath();
+            draw_start(currX, currY)
             dot_flag = false;
 
-            sendPixel(currX, currY);
+            sendPixel(currX, currY, 1);
         }
     }
     if (res == 'up' || res == "out") {
@@ -131,9 +154,9 @@ function findxy(res, e) {
             prevY = currY;
             currX = e.clientX - canvas.offsetLeft;
             currY = e.clientY - canvas.offsetTop;
-            draw();
+            draw_arc(prevX, prevY, currX, currY);
 
-            sendPixel(currX, currY);
+            sendPixel(currX, currY, 0);
         }
     }
 }

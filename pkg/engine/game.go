@@ -28,8 +28,9 @@ const (
 // PlayerState ...
 type PlayerState struct {
 	// basic state
-	ID   uint8 // Max 256 players per game
-	Conn *websocket.Conn
+	ID        uint8 // Max 256 players per game
+	Conn      *websocket.Conn
+	PixelChan chan Pixel
 
 	// player information
 	IP        string
@@ -49,6 +50,27 @@ func makePlayerMap() *PlayerMap {
 	return &PlayerMap{internal: make(map[int]*PlayerState)}
 }
 
+func (c *PlayerMap) BroadcastPixel(pixel Pixel) {
+	c.Lock()
+	defer c.Unlock()
+	for _, v := range c.internal {
+		v.PixelChan <- pixel
+	}
+}
+
+func (c *PlayerMap) Load(key int) (value *PlayerState, ok bool) {
+	c.RLock()
+	defer c.RUnlock()
+	result, ok := c.internal[key]
+	return result, ok
+}
+
+func (c *PlayerMap) Store(key int, value *PlayerState) {
+	c.Lock()
+	defer c.Unlock()
+	c.internal[key] = value
+}
+
 func (c *PlayerMap) LoadOrStore(key int, value *PlayerState) (actual *PlayerState, loaded bool) {
 	c.Lock()
 	defer c.Unlock()
@@ -61,8 +83,8 @@ func (c *PlayerMap) LoadOrStore(key int, value *PlayerState) (actual *PlayerStat
 }
 
 func (c *PlayerMap) Length() int {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
+	defer c.RUnlock()
 	return len(c.internal)
 }
 
@@ -75,12 +97,10 @@ func (c *PlayerMap) Delete(key int) {
 // Game ...
 type Game struct {
 	PlayersByID *PlayerMap // Player ID -> PlayerState
-	Drawer      *PlayerState
+	DrawerID    int
 
 	ID    string
 	Start time.Time
-
-	PixelChan chan Pixel
 }
 
 func NewGame() *Game {
@@ -88,8 +108,20 @@ func NewGame() *Game {
 	return &Game{
 		ID:          "asdf",
 		PlayersByID: makePlayerMap(),
-		PixelChan:   make(chan Pixel),
 	}
+}
+
+func (g *Game) setDrawerID(playerID int) (ok bool) {
+	if _, ok := g.PlayersByID.Load(playerID); !ok {
+		return false
+	}
+	g.DrawerID = playerID
+	return true
+}
+
+func (g *Game) getDrawer() *PlayerState {
+	drawer, _ := g.PlayersByID.Load(g.DrawerID)
+	return drawer
 }
 
 func (g *Game) gameURL() (url string) {
@@ -97,7 +129,11 @@ func (g *Game) gameURL() (url string) {
 }
 
 func (g *Game) registerPlayer(ws *websocket.Conn) (newID int) {
+	newPlayer := &PlayerState{
+		Conn:      ws,
+		PixelChan: make(chan Pixel),
+	}
 	newID = g.PlayersByID.Length()
-	g.PlayersByID.LoadOrStore(newID, &PlayerState{Conn: ws})
+	g.PlayersByID.Store(newID, newPlayer)
 	return newID
 }
