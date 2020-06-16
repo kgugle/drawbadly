@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	// "log"
 	"sync"
 	"time"
 
@@ -28,9 +29,8 @@ const (
 // PlayerState ...
 type PlayerState struct {
 	// basic state
-	ID        uint8 // Max 256 players per game
-	Conn      *websocket.Conn
-	PixelChan chan Pixel
+	ID   uint8 // Max 256 players per game
+	Conn *websocket.Conn
 
 	// player information
 	IP        string
@@ -50,12 +50,17 @@ func makePlayerMap() *PlayerMap {
 	return &PlayerMap{internal: make(map[int]*PlayerState)}
 }
 
-func (c *PlayerMap) BroadcastPixel(pixel Pixel) {
+func (c *PlayerMap) BroadcastPixel(pixelData []byte) error {
 	c.Lock()
 	defer c.Unlock()
 	for _, v := range c.internal {
-		v.PixelChan <- pixel
+		playerConn := v.Conn
+
+		if err := playerConn.WriteMessage(websocket.BinaryMessage, pixelData); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (c *PlayerMap) Load(key int) (value *PlayerState, ok bool) {
@@ -130,8 +135,7 @@ func (g *Game) gameURL() (url string) {
 
 func (g *Game) registerPlayer(ws *websocket.Conn) (newID int) {
 	newPlayer := &PlayerState{
-		Conn:      ws,
-		PixelChan: make(chan Pixel),
+		Conn: ws,
 	}
 	newID = g.PlayersByID.Length()
 	g.PlayersByID.Store(newID, newPlayer)

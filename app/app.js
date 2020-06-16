@@ -14,6 +14,7 @@ var gameSocket = null;
 
 function init() {
     gameSocket = new WebSocket("ws://localhost:9000/game");
+    gameSocket.binaryType = 'arraybuffer';
 
     gameSocket.onmessage = function (event) {
       drawReceivedPixel(event.data);
@@ -47,11 +48,10 @@ function sendPixel(currX, currY, stroke_start) {
 }
 
 function drawReceivedPixel(pixel_data) {
-  var res = pixel_data.split(" "),
-      x = res[0],
-      y = res[1],
-      stroke_start = res[2];
-  console.log(res)
+  var pixelBuffer = new Uint32Array(pixel_data),
+      x = pixelBuffer[0]
+      y = pixelBuffer[1]
+      stroke_start = pixelBuffer[2]
   if (stroke_start == 1) {
     draw_start(x, y);
     prevReceivedX = x;

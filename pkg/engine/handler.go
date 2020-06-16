@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"encoding/binary"
-	"fmt"
+	// "encoding/binary"
+	// "fmt"
 	"log"
 	"net/http"
 	"time"
@@ -54,34 +54,18 @@ func GameHandler(g *Game, w http.ResponseWriter, r *http.Request) {
 			}
 
 			// TODO: let's marshal this into a struct
-			x := binary.LittleEndian.Uint32(drawBuffer[:4])
-			y := binary.LittleEndian.Uint32(drawBuffer[4:8])
-			ss := binary.LittleEndian.Uint32(drawBuffer[8:])
+			// x := binary.LittleEndian.Uint32(drawBuffer[:4])
+			// y := binary.LittleEndian.Uint32(drawBuffer[4:8])
+			// ss := binary.LittleEndian.Uint32(drawBuffer[8:])
 
-			g.PlayersByID.BroadcastPixel(Pixel{x, y, uint8(0), ss != 0})
+			// fmt.Printf("send %d %d\n", x, y)
+			// g.PlayersByID.BroadcastPixel(Pixel{x, y, uint8(0), ss != 0})
+			if err := g.PlayersByID.BroadcastPixel(drawBuffer); err != nil {
+				log.Println("broadcast_pixel_error", err)
+			}
 		}
 	} else {
-		player, _ := g.PlayersByID.Load(playerID)
 		for {
-			select {
-			case pixel, ok := <-player.PixelChan:
-				if !ok {
-					log.Println("pixel_channel_error")
-					return
-				}
-				var ss uint32
-				if pixel.StrokeStart {
-					ss = 1
-				} else {
-					ss = 0
-				}
-				msg := fmt.Sprintf("%d %d %d\n", pixel.X, pixel.Y, ss)
-
-				if err := playerConn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
-					log.Println("player_stream_write_error", err)
-					return
-				}
-			}
 		}
 	}
 }
