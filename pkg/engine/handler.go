@@ -1,8 +1,6 @@
 package engine
 
 import (
-	// "encoding/binary"
-	// "fmt"
 	"log"
 	"net/http"
 	"time"
@@ -39,8 +37,8 @@ func GameHandler(g *Game, w http.ResponseWriter, r *http.Request) {
 	playerID := g.registerPlayer(playerConn)
 	log.Printf("player registered with ID %d", playerID)
 
-	if g.PlayersByID.Length() == 1 {
-		if ok := g.setDrawerID(playerID); !ok {
+	if g.Players.Length() == 1 {
+		if ok := g.setDrawer(playerID); !ok {
 			log.Print("set_drawer_state_failed")
 			return
 		}
@@ -59,8 +57,7 @@ func GameHandler(g *Game, w http.ResponseWriter, r *http.Request) {
 			// ss := binary.LittleEndian.Uint32(drawBuffer[8:])
 
 			// fmt.Printf("send %d %d\n", x, y)
-			// g.PlayersByID.BroadcastPixel(Pixel{x, y, uint8(0), ss != 0})
-			if err := g.PlayersByID.BroadcastPixel(drawBuffer); err != nil {
+			if err := g.BroadcastPixel(drawBuffer); err != nil {
 				log.Println("broadcast_pixel_error", err)
 			}
 		}

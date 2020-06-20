@@ -15,10 +15,10 @@ type ConnectionStatus int
 // connection states
 const (
 	Connected ConnectionStatus = 0
-	// ReadFailing is set when a single read fails on PlayerState.Conn. This
+	// ReadFailing is set when a single read fails on Player.Conn. This
 	// gives us an early indication that a client might fail.
 	ReadFailing ConnectionStatus = 1
-	// WriteFailing is set when a single write fails on PlayerState.Conn. This
+	// WriteFailing is set when a single write fails on Player.Conn. This
 	// gives us an early indication that a client might fail.
 	WriteFailing ConnectionStatus = 2
 	// Disconnected describes a player that has temporarily disappeared, and
@@ -26,57 +26,40 @@ const (
 	Disconnected ConnectionStatus = 0
 )
 
-// PlayerState ...
-type PlayerState struct {
-	// basic state
-	ID   uint8 // Max 256 players per game
-	Conn *websocket.Conn
-
-	// player information
-	IP        string
-	FirstName string
-
+// Player ...
+type Player struct {
+	ID     uint8 // Max 256 players per game
+	Conn   *websocket.Conn
+	Score  int
+	IP     string
+	Name   string
 	Mutex  sync.RWMutex
-	Score  []int // Append scores
 	Status ConnectionStatus
 }
 
 type PlayerMap struct {
 	sync.RWMutex
-	internal map[int]*PlayerState
+	internal map[int]*Player
 }
 
 func makePlayerMap() *PlayerMap {
-	return &PlayerMap{internal: make(map[int]*PlayerState)}
+	return &PlayerMap{internal: make(map[int]*Player)}
 }
 
-func (c *PlayerMap) BroadcastPixel(pixelData []byte) error {
-	c.Lock()
-	defer c.Unlock()
-	for _, v := range c.internal {
-		playerConn := v.Conn
-
-		if err := playerConn.WriteMessage(websocket.BinaryMessage, pixelData); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *PlayerMap) Load(key int) (value *PlayerState, ok bool) {
+func (c *PlayerMap) Load(key int) (value *Player, ok bool) {
 	c.RLock()
 	defer c.RUnlock()
 	result, ok := c.internal[key]
 	return result, ok
 }
 
-func (c *PlayerMap) Store(key int, value *PlayerState) {
+func (c *PlayerMap) Store(key int, value *Player) {
 	c.Lock()
 	defer c.Unlock()
 	c.internal[key] = value
 }
 
-func (c *PlayerMap) LoadOrStore(key int, value *PlayerState) (actual *PlayerState, loaded bool) {
+func (c *PlayerMap) LoadOrStore(key int, value *Player) (actual *Player, loaded bool) {
 	c.Lock()
 	defer c.Unlock()
 	actual, ok := c.internal[key]
@@ -101,43 +84,61 @@ func (c *PlayerMap) Delete(key int) {
 
 // Game ...
 type Game struct {
-	PlayersByID *PlayerMap // Player ID -> PlayerState
-	DrawerID    int
+	Players  *PlayerMap // Player ID -> Player
+	DrawerID int
 
-	ID    string
-	Start time.Time
+	ID      string
+	RootURL string
 }
 
-func NewGame() *Game {
+func NewGame(root_url string) *Game {
 	// TODO: randomly generate an ID
 	return &Game{
-		ID:          "asdf",
-		PlayersByID: makePlayerMap(),
+		ID:      "asdf",
+		Players: makePlayerMap(),
+		RootURL: root_url,
 	}
 }
 
-func (g *Game) setDrawerID(playerID int) (ok bool) {
-	if _, ok := g.PlayersByID.Load(playerID); !ok {
+func (g *Game) setDrawer(playerID int) (ok bool) {
+	if _, ok := g.Players.Load(playerID); !ok {
 		return false
 	}
 	g.DrawerID = playerID
 	return true
 }
 
-func (g *Game) getDrawer() *PlayerState {
-	drawer, _ := g.PlayersByID.Load(g.DrawerID)
+func (g *Game) Drawer() *Player {
+	drawer, _ := g.Players.Load(g.DrawerID)
 	return drawer
 }
 
 func (g *Game) gameURL() (url string) {
-	return fmt.Sprintf("localhost:9000/%s", g.ID)
+	return fmt.Sprintf("%s/%s", g.RootURL, g.ID)
 }
 
 func (g *Game) registerPlayer(ws *websocket.Conn) (newID int) {
-	newPlayer := &PlayerState{
+	newPlayer := &Player{
 		Conn: ws,
 	}
-	newID = g.PlayersByID.Length()
-	g.PlayersByID.Store(newID, newPlayer)
+	newID = g.Players.Length()
+	g.Players.Store(newID, newPlayer)
 	return newID
+}
+
+func (g *Game) BroadcastPixel(pixelData []byte) error {
+	c := g.Players
+	c.Lock()
+	defer c.Unlock()
+	for i, v := range c.internal {
+		if i == g.DrawerID {
+			continue
+		}
+		playerConn := v.Conn
+
+		if err := playerConn.WriteMessage(websocket.BinaryMessage, pixelData); err != nil {
+			return err
+		}
+	}
+	return nil
 }
