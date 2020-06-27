@@ -36,6 +36,7 @@ func GameHandler(g *Game, w http.ResponseWriter, r *http.Request) {
 
 	playerID := g.registerPlayer(playerConn)
 	log.Printf("player registered with ID %d", playerID)
+	g.logGameState()
 
 	if g.Players.Length() == 1 {
 		if ok := g.setDrawer(playerID); !ok {
