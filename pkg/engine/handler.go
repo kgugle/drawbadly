@@ -24,18 +24,34 @@ func LivenessHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+// GameHandler creates a game with a new random ID
+func CreateGameHandler(gh *GameHub, w http.ResponseWriter, r *http.Request) {
+	gh.registerGame(r.Host)
+}
+
 // GameHandler serves the game
-func GameHandler(g *Game, w http.ResponseWriter, r *http.Request) {
+func GameHandler(gh *GameHub, w http.ResponseWriter, r *http.Request) {
+	keys, ok := r.URL.Query()["id"]
+	if !ok || len(keys[0]) < 1 {
+		http.Error(w, "404, no game id provided.", http.StatusNotFound)
+		return
+	}
+	gameID := keys[0]
+	g, ok := gh.Games.Load(gameID)
+	if !ok {
+		http.Error(w, "404, game not found.", http.StatusNotFound)
+		return
+	}
+
 	playerConn, err := upgrade_connection_to_ws(w, r)
 	if err != nil {
 		log.Print("player_stream_upgrade_failed", err)
 		return
 	}
-	log.Println("player connected")
 	defer playerConn.Close()
 
 	playerID := g.registerPlayer(playerConn)
-	log.Printf("player registered with ID %d", playerID)
+	log.Printf("player ID %d registered", playerID)
 	g.logGameState()
 
 	if g.Players.Length() == 1 {

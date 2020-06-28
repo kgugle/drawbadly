@@ -4,33 +4,39 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/kgugle/drawbadly/pkg/engine"
 )
 
 var (
-	socketEndpoint int
+	socketPort int
 )
 
 func init() {
-	socketEndpoint = *flag.Int("socket-endpoint", 9000, "Client Websocket Endpoint")
+	flag.IntVar(&socketPort, "port", 9000, "Client Websocket Endpoint")
 }
 
 func main() {
 	flag.Parse()
+	rootURL := fmt.Sprintf("localhost:%d", socketPort)
 
-	rootURL := fmt.Sprintf("localhost:%d", socketEndpoint)
-	// TODO: replace with game hub
-	game := engine.NewGame(rootURL)
+	rand.Seed(time.Now().UnixNano())
+
+	gameHub := engine.NewGameHub()
 
 	// define endpoints
+	http.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
+		engine.CreateGameHandler(gameHub, w, r)
+	})
 	http.HandleFunc("/game", func(w http.ResponseWriter, r *http.Request) {
-		engine.GameHandler(game, w, r)
+		engine.GameHandler(gameHub, w, r)
 	})
 	http.HandleFunc("/liveness", engine.LivenessHandler)
 
-	log.Println("GameServer running on localhost:", socketEndpoint)
+	log.Printf("GameServer running on %s\n", rootURL)
 	if err := http.ListenAndServe(rootURL, nil); err != nil {
 		log.Fatal("game_server_error", err)
 	}
